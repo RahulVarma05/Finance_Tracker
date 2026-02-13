@@ -1,0 +1,32 @@
+{
+    "timestamp": "2026-02-13T13:24:16.203728",
+    "accuracy": 0.955,
+    "dataset_size": 2998,
+    "calibration_enabled": true,
+    "train_test_split_ratio": 0.2,
+    "random_seed": 42,
+    "model_type": "LogisticRegression",
+    "vectorizer_params": {
+        "analyzer": "word",
+        "binary": "False",
+        "decode_error": "strict",
+        "dtype": "<class 'numpy.float64'>",
+        "encoding": "utf-8",
+        "input": "content",
+        "lowercase": "True",
+        "max_df": "1.0",
+        "max_features": "5000",
+        "min_df": "1",
+        "ngram_range": "(1, 2)",
+        "norm": "l2",
+        "preprocessor": "None",
+        "smooth_idf": "True",
+        "stop_words": "english",
+        "strip_accents": "None",
+        "sublinear_tf": "False",
+        "token_pattern": "(?u)\\b\\w\\w+\\b",
+        "tokenizer": "None",
+        "use_idf": "True",
+        "vocabulary": "None"
+    }
+}
