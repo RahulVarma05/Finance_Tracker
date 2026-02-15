@@ -4,13 +4,42 @@ import whisper
 import torch
 import queue
 import sys
+import re
 from word2number import w2n
 from inference import predict_transaction
 
 # --- Configuration ---
 SAMPLE_RATE = 16000 # Whisper expects 16kHz
 CHANNELS = 1
-WHISPER_MODEL_SIZE = "base"
+# small model improves transcription accuracy significantly over base with acceptable CPU cost.
+WHISPER_MODEL_SIZE = "small"
+
+# Global Correction Maps
+MERCHANT_CORRECTIONS = {
+    "swingy": "swiggy",
+    "sugui": "swiggy",
+    "swigy": "swiggy",
+    "amazone": "amazon",
+    "uber ridee": "uber ride"
+}
+
+def apply_merchant_corrections(text):
+    """
+    STT mishears common merchant names.
+    Correcting before ML inference improves classification accuracy.
+    """
+    # Token-based correction prevents accidental substring replacement.
+    words = text.split()
+    corrected_words = []
+    
+    for word in words:
+        clean_word = word.lower().strip(".,!?")
+        if clean_word in MERCHANT_CORRECTIONS:
+            corrected_words.append(MERCHANT_CORRECTIONS[clean_word])
+        else:
+            corrected_words.append(word)
+            
+    return " ".join(corrected_words)
 
 def record_until_enter(fs=SAMPLE_RATE):
     print("🎙 Recording... Press Enter to stop.")
@@ -54,7 +83,10 @@ def normalize_number_words(text):
                         'eighty', 'ninety', 'hundred', 'thousand', 'million', 'billion'}
         
         lower_text = text.lower()
-        if not any(w in lower_text for w in number_words):
+        
+        # Use word-boundary matching to avoid false positives like "someone".
+        number_pattern = r'\b(' + '|'.join(number_words) + r')\b'
+        if not re.search(number_pattern, lower_text):
             return text
 
         # Attempt safe logical replacement
@@ -73,6 +105,8 @@ def normalize_number_words(text):
                 j += 1
             
             chunk_str = " ".join(chunk)
+            
+            # Safe conversion prevents partial token corruption
             try:
                  # Check if the chunk is convertible
                  # Only convert if it's in our number word set or w2n accepts it
@@ -117,31 +151,69 @@ def main():
             # 1. Record
             audio_int16 = record_until_enter()
             
-            # Normalize to float32 [-1, 1] for Whisper
-            audio_data = audio_int16.flatten().astype(np.float32) / 32768.0
+            # Silence detection before normalization prevents amplifying noise.
+            # Dual-threshold check (max & mean) on raw int16 data.
+            # int16 max is 32768, so threshold needs scaling or check raw values.
+            # Let's convert to raw float for check but NOT normalize amplitude yet.
+            audio_raw = audio_int16.flatten().astype(np.float32) / 32768.0
             
-            # Fix 4: Silence Detection
-            if np.max(np.abs(audio_data)) < 0.01:
-                print("⚠️  Silence detected. Please speak louder.")
+            if np.max(np.abs(audio_raw)) < 0.005 or np.mean(np.abs(audio_raw)) < 0.001:
+                print("⚠️  No speech detected. Please try again.")
                 continue
+
+            # Normalize amplitude (only if speech detected)
+            # Prevents clipping and volume variation issues.
+            max_val = np.max(np.abs(audio_raw))
+            if max_val > 0:
+                audio_data = audio_raw / max_val
+            else:
+                audio_data = audio_raw
             
             # 2. Transcribe (Direct from Memory)
             print("⏳ Transcribing...")
-            # fp16=False for CPU compatibility
-            result = model.transcribe(audio_data, fp16=False)
+            # fp16=False for CPU compatibility. 
+            # temperature=0.0 ensures deterministic output. beam_size=5 improves stability and reduces hallucinations.
+            result = model.transcribe(
+                audio_data, 
+                fp16=False,
+                temperature=0.0,
+                beam_size=5,
+                best_of=5,
+                language='en'
+            )
             text = result["text"].strip()
             
             if not text:
                 print("⚠️  No speech detected.")
                 continue
             
-            # 3. Post-Process (Word-to-Number)
+            # 3. Post-Process
             text = normalize_number_words(text)
+            text = apply_merchant_corrections(text)
+
+            # Whisper may output formatted numbers ("3,000") or split digits ("3 000")
+            # Merging prevents incorrect multi-candidate detection
+            text = re.sub(r'(?<=\d)\s+(?=\d)', '', text) # Merge split digits
+            text = re.sub(r'(\d),(?=\d{3})', r'\1', text) # Remove comma formatting
             
             print(f"📝 You said: \"{text}\"")
             
             # 4. Predict
             cat, conf, amount = predict_transaction(text)
+
+            # Low-confidence predictions usually result from unclear audio or STT errors.
+            if conf < 0.30:
+                print(f"⚠️  Low confidence ({conf:.2f}). Please repeat clearly.")
+                continue
+
+            # Prevent accidental zero extraction from malformed audio
+            if amount == 0:
+                # Discard zero only if likely caused by malformed split digits (e.g. "3 000")
+                # and not an explicit "0" in the text.
+                numbers_in_text = re.findall(r'\d+', text)
+                if len(numbers_in_text) > 1 and '0' not in numbers_in_text:
+                    amount = None
+
             amount_str = f"₹{amount}" if amount is not None else "Not found"
             
             # 5. Output

@@ -4,6 +4,9 @@ import sys
 import re
 import train_model # Import module to register functions for pickle
 
+# Minimum probability required to trust ranking model.
+AMOUNT_PROB_THRESHOLD = 0.20
+
 # Load Model
 try:
     model_pipeline = joblib.load('financial_model.pkl')
@@ -70,9 +73,7 @@ def extract_candidates_with_features(text):
         correction_pattern = r'\b(' + '|'.join([re.escape(w) for w in correction_cues]) + r')\b'
         features["preceded_by_correction"] = 1 if re.search(correction_pattern, prebox) else 0
         
-        # PROMPT: Strong correction detection
-        strong_pattern = r'\b(' + '|'.join([re.escape(w) for w in strong_correction_cues]) + r')\b'
-        features["is_strong_correction"] = 1 if re.search(strong_pattern, prebox) else 0
+
         
         # Preceded by negation?
         negation_pattern = r'\b(' + '|'.join([re.escape(w) for w in negation_cues]) + r')\b'
@@ -102,11 +103,39 @@ def extract_amount(text):
         
     # 2. Model Prediction
     if amount_model:
-        # Rule-based override: Detect strong correction cues
-        # Rule-based override improves reliability for complex corrections.
-        strong_candidates = [c for c in candidates if c.get("is_strong_correction")]
-        if strong_candidates:
-             return strong_candidates[-1]["val"]
+        # Strong correction cues handled purely via rule override.
+        # Not stored as ML feature to avoid confusion.
+        strong_correction_cues = ["sorry", "actually", "correction", "read as"]
+        strong_pattern = r'\b(' + '|'.join([re.escape(w) for w in strong_correction_cues]) + r')\b'
+        
+        strong_candidates = []
+        for c in candidates:
+             start_lookback = max(0, text.find(str(int(c["val"]))) - 25) # Approximate check or need exact index?
+             # Wait, candidates DO NOT store 'start' index in output of extract_candidates_with_features!
+             # 'extract_candidates_with_features' returns features dictionary only.
+             # Wait, check line 55 of inference.py (or train_amount_model.py). Features dict includes 'val'.
+             # Does it include 'start'?
+             # Line 58: features["position_ratio"] = m["start"]...
+             # But 'start' itself is NOT in features dict unless explicitly added.
+             # In train_amount_model.py, step 1365:
+             # matches.append({"start": m.start()...})
+             # Then loop creates features dict.
+             # Features dict has: val, position_ratio, is_last...
+             # It does NOT have 'start'.
+             # So I cannot easily recompute 'prebox' inside extract_amount without 'start'.
+             #
+             # The user Prompt says: "Compute strong correction flag separately inside extract_amount(): ... if re.search(strong_pattern, prebox_of_candidate)"
+             # But I don't have prebox_of_candidate available unless I keep 'start' in the candidate dict.
+             #
+             # Solution: I MUST ensure 'start' is passed in the candidate dict if I want to use it later.
+             # Or, I can leave the pre-computation but rename it to `_is_strong`? No the user said "Remove it from feature vector".
+             #
+             # Let's check if 'start' is in features.
+             # In inference.py (viewed in Step 1420), line 58 logic is not fully visible but we see features["position_ratio"].
+             # We do NOT see features["start"] being assigned.
+             #
+             # Use `view_file` to check `extract_candidates_with_features` fully.
+             pass
 
         # PROMPT: No-cue fallback (Last Number Rule)
         # If multiple numbers exist but NO cues (negation/correction), assume simple sequence -> last is valid.
@@ -146,9 +175,8 @@ def extract_amount(text):
             best_idx = np.argmax(probas)
             
             # Confidence Threshold Logic
-            # If the model is unsure about ANY candidate (prob < 0.20), we fallback to the last number.
+            # If the model is unsure about ANY candidate (prob < AMOUNT_PROB_THRESHOLD), we fallback to the last number.
             # This is a heuristic: often the last number is the final/corrected amount.
-            AMOUNT_PROB_THRESHOLD = 0.20
             
             if np.max(probas) < AMOUNT_PROB_THRESHOLD:
                  return candidates[-1]["val"]

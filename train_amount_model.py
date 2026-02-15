@@ -147,10 +147,11 @@ def train_amount_extractor():
     df = pd.read_csv('transactions.csv')
     print(f"Loaded {len(df)} samples.")
     if len(df) < 1000:
-        print("\n⚠️  WARNING: Dataset size is small (< 1000 samples).")
-        print("    Accuracy may be poor. Please regenerate data with: python generate_data.py --samples 3000")
-        import time
-        time.sleep(2)
+        # Prevent accidental under-training with insufficient data.
+        raise ValueError(
+            "Dataset too small (<1000). Regenerate using: "
+            "python generate_data.py --samples 3000 --imbalance"
+        )
     
     
     # --- CRITICAL FIX: TRANSATION-LEVEL SPLIT ---

@@ -21,7 +21,7 @@ The system uses a **Dual-Model Architecture**:
 The voice interface (`voice_inference.py`) follows this pipeline:
 
 1.  **Capture**: Records audio via `sounddevice` (silence detection enabled).
-2.  **Transcribe**: Uses **OpenAI Whisper (Base Model)** to convert speech to text.
+2.  **Transcribe**: Uses **OpenAI Whisper (Small Model)** for improved transcription accuracy.
 3.  **Normalize**: Smart `word2number` logic converts phrases like "three hundred" to "300" without corrupting non-numeric text.
 4.  **Influence**: Passes normalized text to the inference engine.
 

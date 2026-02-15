@@ -23,12 +23,13 @@ random.seed(42)
 # 1. Load Data
 def load_data(filepath='transactions.csv'):
     df = pd.read_csv(filepath)
-    print(f"Loaded {len(df)} samples.")
     if len(df) < 1000:
-        print("\n⚠️  WARNING: Dataset size is small (< 1000 samples).")
-        print("    Accuracy may be poor. Please regenerate data with: python generate_data.py --samples 3000")
-        import time
-        time.sleep(2) # Give user a moment to see warning
+        # Prevent accidental under-training with insufficient data.
+        raise ValueError(
+            "Dataset too small (<1000 samples). "
+            "Run: python generate_data.py --samples 3000 --imbalance"
+        )
+    print(f"Loaded {len(df)} samples.")
     return df
 
 # 2. Preprocessing
