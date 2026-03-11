@@ -1,0 +1,5 @@
+date,text,category,amount,type
+2026-03-10 18:56:56,credited 50000 to my account,Income,50000.0,income
+2026-03-10 18:56:56,paid 12000 for rent,Housing,12000.0,expense
+2026-03-10 18:56:56,bought groceries 800,Shopping,800.0,expense
+2026-03-10 19:07:27,salary of 50k,Income,50.0,income

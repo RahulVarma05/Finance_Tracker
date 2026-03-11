@@ -1,12 +1,12 @@
 {
     "model_type": "GradientBoostingClassifier",
-    "timestamp": "2026-02-13T13:25:21.837759",
+    "timestamp": "2026-03-09T21:52:40.150057",
     "random_seed": 42,
     "train_test_split": "80/20",
-    "train_transactions": 2398,
-    "test_transactions": 600,
-    "candidate_accuracy": 0.9666,
-    "transaction_accuracy": 0.995,
+    "train_transactions": 3426,
+    "test_transactions": 857,
+    "candidate_accuracy": 0.9544,
+    "transaction_accuracy": 0.9917,
     "features": [
         "position_ratio",
         "is_last",

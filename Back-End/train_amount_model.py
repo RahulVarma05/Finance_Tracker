@@ -175,8 +175,6 @@ def train_amount_extractor():
     
     print(f"Train Candidate Rows: {len(X_train)}")
     print(f"Test Candidate Rows: {len(X_test)}")
-    count_train_candidates = len(X_train)
-    count_test_candidates = len(X_test)
     
     print("\nTraining Gradient Boosting Classifier...")
     # Why Gradient Boosting?

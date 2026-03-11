@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+.env
+
+# Database
+*.db
+
+# ML models
+*.pkl
+
+# OS files
+.DS_Store
+Thumbs.db
+Back-End/finance.db
+Back-End/*.pkl
+Back-End/__pycache__/

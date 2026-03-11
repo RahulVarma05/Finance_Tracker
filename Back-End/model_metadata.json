@@ -1,0 +1,12 @@
+{
+    "timestamp": "2026-03-09T22:10:35.909053",
+    "accuracy": 0.9666,
+    "dataset_size": 5085,
+    "model_type": "LogisticRegression",
+    "calibration_enabled": true,
+    "train_test_split_ratio": 0.2,
+    "random_seed": 42,
+    "tfidf_ngrams": "(1,2)",
+    "tfidf_max_features": 15000,
+    "tfidf_sublinear_tf": true
+}

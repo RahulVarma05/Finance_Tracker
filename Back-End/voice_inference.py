@@ -7,6 +7,7 @@ import sys
 import re
 from word2number import w2n
 from inference import predict_transaction
+import requests
 
 # --- Configuration ---
 SAMPLE_RATE = 16000 # Whisper expects 16kHz
@@ -202,7 +203,7 @@ def main():
             cat, conf, amount = predict_transaction(text)
 
             # Low-confidence predictions usually result from unclear audio or STT errors.
-            if conf < 0.30:
+            if conf < 0.50:
                 print(f"⚠️  Low confidence ({conf:.2f}). Please repeat clearly.")
                 continue
 
@@ -222,6 +223,22 @@ def main():
             print(f"📊 Confidence: {conf:.2f}")
             print(f"💰 Amount: {amount_str}")
             print("-" * 40)
+            
+            # 6. Save via API
+            if amount is not None:
+                try:
+                    res = requests.post("http://127.0.0.1:8000/transaction/add", json={
+                        "text": text,
+                        "category": cat,
+                        "amount": amount,
+                        "confidence": conf
+                    })
+                    if res.status_code == 200:
+                        print(f"✅ Saved directly to database (ID: {res.json().get('id', 'N/A')})")
+                    else:
+                        print(f"❌ Failed to save via API: {res.text}")
+                except Exception as e:
+                    print(f"❌ API connection error: {e}. Is api.py running?")
             
         except KeyboardInterrupt:
             print("\n👋 Exiting.")

@@ -2,6 +2,13 @@ import joblib
 import numpy as np
 import sys
 import re
+import csv
+import os
+import pandas as pd
+from datetime import datetime
+
+# Fix Windows PowerShell Unicode output (allows ₹ symbol to print correctly)
+sys.stdout.reconfigure(encoding='utf-8')
 import train_model # Import module to register functions for pickle
 
 # Minimum probability required to trust ranking model.
@@ -103,40 +110,6 @@ def extract_amount(text):
         
     # 2. Model Prediction
     if amount_model:
-        # Strong correction cues handled purely via rule override.
-        # Not stored as ML feature to avoid confusion.
-        strong_correction_cues = ["sorry", "actually", "correction", "read as"]
-        strong_pattern = r'\b(' + '|'.join([re.escape(w) for w in strong_correction_cues]) + r')\b'
-        
-        strong_candidates = []
-        for c in candidates:
-             start_lookback = max(0, text.find(str(int(c["val"]))) - 25) # Approximate check or need exact index?
-             # Wait, candidates DO NOT store 'start' index in output of extract_candidates_with_features!
-             # 'extract_candidates_with_features' returns features dictionary only.
-             # Wait, check line 55 of inference.py (or train_amount_model.py). Features dict includes 'val'.
-             # Does it include 'start'?
-             # Line 58: features["position_ratio"] = m["start"]...
-             # But 'start' itself is NOT in features dict unless explicitly added.
-             # In train_amount_model.py, step 1365:
-             # matches.append({"start": m.start()...})
-             # Then loop creates features dict.
-             # Features dict has: val, position_ratio, is_last...
-             # It does NOT have 'start'.
-             # So I cannot easily recompute 'prebox' inside extract_amount without 'start'.
-             #
-             # The user Prompt says: "Compute strong correction flag separately inside extract_amount(): ... if re.search(strong_pattern, prebox_of_candidate)"
-             # But I don't have prebox_of_candidate available unless I keep 'start' in the candidate dict.
-             #
-             # Solution: I MUST ensure 'start' is passed in the candidate dict if I want to use it later.
-             # Or, I can leave the pre-computation but rename it to `_is_strong`? No the user said "Remove it from feature vector".
-             #
-             # Let's check if 'start' is in features.
-             # In inference.py (viewed in Step 1420), line 58 logic is not fully visible but we see features["position_ratio"].
-             # We do NOT see features["start"] being assigned.
-             #
-             # Use `view_file` to check `extract_candidates_with_features` fully.
-             pass
-
         # PROMPT: No-cue fallback (Last Number Rule)
         # If multiple numbers exist but NO cues (negation/correction), assume simple sequence -> last is valid.
         has_cues = any(c.get("preceded_by_correction") or c.get("preceded_by_negation") for c in candidates)
@@ -221,15 +194,80 @@ def predict_transaction(text):
     
     return prediction, confidence, amount
 
+# ── Ledger System ────────────────────────────────────────────────────────────
+LEDGER_FILE = 'ledger.csv'
+
+def log_transaction(text, category, amount):
+    file_exists = os.path.isfile(LEDGER_FILE)
+    
+    with open(LEDGER_FILE, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(['date', 'text', 'category', 'amount', 'type'])
+            
+        trans_type = 'income' if category.lower() == 'income' else 'expense'
+        date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        writer.writerow([date_str, text, category, amount, trans_type])
+
+def show_history():
+    if not os.path.exists(LEDGER_FILE):
+        print("No transactions yet.")
+        return
+        
+    df = pd.read_csv(LEDGER_FILE)
+    if df.empty:
+        print("No transactions yet.")
+        return
+        
+    print("\n--- Transaction History (Last 10) ---")
+    print(df.tail(10).to_string(index=False))
+
+def show_summary():
+    if not os.path.exists(LEDGER_FILE):
+        print("No transactions yet.")
+        return
+        
+    df = pd.read_csv(LEDGER_FILE)
+    if df.empty:
+        print("No transactions yet.")
+        return
+        
+    # Ensure amount is float
+    df['amount'] = pd.to_numeric(df['amount'], errors='coerce').fillna(0)
+    
+    income = df[df['type'] == 'income']['amount'].sum()
+    expense = df[df['type'] == 'expense']['amount'].sum()
+    balance = income - expense
+    
+    print("\n" + "=" * 35)
+    print(" 💰 FINANCIAL SUMMARY")
+    print("=" * 35)
+    print(f" Total Income:  ₹{income:.2f}")
+    print(f" Total Expense: ₹{expense:.2f}")
+    print("-" * 35)
+    print(f" Net Balance:   ₹{balance:.2f}")
+    print("=" * 35)
+
 if __name__ == "__main__":
     print("\n--- Financial Transaction Classifier ---")
-    print("Type a transaction description to classify (or 'exit' to quit).")
+    print("Type a transaction description to classify.")
+    print("Special Commands: 'summary', 'history', 'exit'")
     
     while True:
         try:
             user_input = input("\nEnter transaction: ")
-            if user_input.lower() in ('exit', 'quit'):
+            
+            # Action Commands
+            cmd = user_input.lower().strip()
+            if cmd in ('exit', 'quit'):
                 break
+            if cmd == 'summary':
+                show_summary()
+                continue
+            if cmd == 'history':
+                show_history()
+                continue
+                
             if not user_input.strip():
                 continue
                 
@@ -249,6 +287,12 @@ if __name__ == "__main__":
             print(f"Confidence: {conf:.2f}")
             print(f"Status:     {status}")
             print(f"Amount:     {amount_str}")
+            
+            # Save to Ledger
+            if amount is not None:
+                log_transaction(user_input, cat, amount)
+                print("💾 Saved to ledger.csv")
+            
             print("-" * 30)
         except KeyboardInterrupt:
             print("\nExiting...")

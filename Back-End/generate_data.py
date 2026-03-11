@@ -1,6 +1,8 @@
 import csv
 import random
 import argparse
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
 
 # Configurable Parameters
 TOTAL_SAMPLES = 3000
@@ -53,14 +55,49 @@ categories = {
         "freeform": ["semester fee payment", "bought clean coding book", "online python course", "school bus fee", "stationery connection", "exam registration fees", "workshop on ai"]
     },
     "Income": {
-        "merchants": ["Employer", "Client", "Bank"],
-        "keywords": ["salary", "stipend", "bonus", "interest", "refund", "cashback", "dividend", "credited"],
-        "freeform": ["salary credited for august", "freelance payment received", "interest credited to account", "tax refund processed", "bonus received", "cashback from credit card"]
+        "merchants": ["Employer", "Client", "Bank", "Google Pay", "PhonePe", "HDFC", "Friend"],
+        "keywords": [
+            "salary", "stipend", "bonus", "interest", "refund", "cashback",
+            "dividend", "credited", "received", "credit", "income", "earnings",
+            "payment received", "money received", "transferred", "deposited"
+        ],
+        "freeform": [
+            "salary credited for august",
+            "freelance payment received",
+            "interest credited to account",
+            "tax refund processed",
+            "bonus received",
+            "cashback from credit card",
+            "received payment from client",
+            "money received from friend",
+            "UPI credit from friend",
+            "payment received for project",
+            "amount credited to account",
+            "bank credit received",
+            "income from freelance work",
+            "money transferred to account",
+            "received salary this month",
+            "got paid for consulting",
+            "transfer received from employer",
+            "credit received in account",
+            "amount deposited in bank",
+            "received cashback on purchase",
+            "annual bonus credited",
+            "dividend credited to account",
+            "reimbursement received from office",
+            "rent received from tenant",
+            "payment got credited"
+        ]
     },
     "Others": {
         "merchants": ["Friend", "Charity", "Unknown"],
         "keywords": ["donation", "gift", "transfer", "withdrawal", "atm", "sent", "received", "misc"],
         "freeform": ["money sent to friend", "charity donation", "atm cash withdrawal", "unknown transaction", "petty cash expense", "gift for wedding", "loan repayment to friend"]
+    },
+    "Investment": {
+        "merchants": ["Zerodha", "Groww", "Upstox", "Coin", "Binance", "WazirX", "CoinSwitch", "Mutual Fund", "SBI Mutual Fund"],
+        "keywords": ["stocks", "sip", "crypto", "equity", "shares", "bonds", "invested", "investment", "portfolio", "deposit", "fd", "fixed deposit", "recurring deposit"],
+        "freeform": ["invested in stocks", "monthly sip deduction", "bought bitcoin", "invested in mutual fund", "opened fixed deposit", "bought shares of company", "added money to zerodha wallet", "crypto purchase successful"]
     }
 }
 
